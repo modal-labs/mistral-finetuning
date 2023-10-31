@@ -25,7 +25,7 @@ def download_dataset():
     from datasets import load_dataset
 
     if not os.path.exists('/training_data/data_train.csv'):
-        dataset = load_dataset('gem/viggo')  # loading data from hugging face
+        dataset = load_dataset('gem/viggo')  # downloading data from hugging face
         for split, dataset in dataset.items():
             dataset.to_csv(f"/training_data/data_{split}.csv") # writing data to training data Volume (mounted at /training-data in container)
         
@@ -84,7 +84,9 @@ def finetune(
         full_prompt =f"""Given a target sentence construct the underlying meaning representation of the input sentence as a single function with attributes and attribute values.
         This function should describe the target string accurately and the function must be one of the following ['inform', 'request', 'give_opinion', 'confirm', 'verify_attribute', 'suggest', 'request_explanation', 'recommend', 'request_attribute'].
         The attributes must be one of the following: ['name', 'exp_release_date', 'release_year', 'developer', 'esrb', 'rating', 'genres', 'player_perspective', 'has_multiplayer', 'platforms', 'available_on_steam', 'has_linux_release', 'has_mac_release', 'specifier']
-
+        The order your list the attributes within the function must follow the order listed above. For example the 'name' attribute must always come before the 'exp_release_date' attribute, and so forth.
+        For each attribute, fill in the corresponding value of the attribute in brackets. A couple of examples are below. Note: you are to output the string after "Output: ". Do not include "Output: " in your answer.
+        
         ### Target sentence:
         {data_point["target"]}
 
@@ -97,7 +99,7 @@ def finetune(
     # Load datasets from training data Volume
     train_dataset = load_dataset('csv', data_files='/training_data/data_train.csv', split='train')
     eval_dataset = load_dataset('csv', data_files='/training_data/data_validation.csv', split='train')
-    
+
     tokenized_train_dataset = train_dataset.map(generate_and_tokenize_prompt)
     tokenized_val_dataset = eval_dataset.map(generate_and_tokenize_prompt)
 
@@ -160,18 +162,18 @@ def finetune(
         args=transformers.TrainingArguments(
             output_dir="/results",  # Must also set this to write into results Volume's mount location
             warmup_steps=5,
-            per_device_train_batch_size=2,
-            gradient_accumulation_steps=4,
-            max_steps=1000,  # Feel free to tweak to correct for under/overfitting
+            per_device_train_batch_size=8,
+            gradient_accumulation_steps=8,
+            # max_steps=500,  # Feel free to tweak to correct for under/overfitting
             learning_rate=2.5e-5, # ~10x smaller than Mistral's learning rate
-            logging_steps=50,
+            logging_steps=20,
             bf16=True,
             optim="adamw_8bit",
             logging_dir="/results/logs",        # Directory for storing logs
             save_strategy="steps",       # Save the model checkpoint every logging step
-            save_steps=50,                # Save checkpoints every 50 steps
+            save_steps=20,                # Save checkpoints every 50 steps
             evaluation_strategy="steps", # Evaluate the model every logging step
-            eval_steps=50,               # Evaluate and save checkpoints every 50 steps
+            eval_steps=20,               # Evaluate and save checkpoints every 50 steps
             do_eval=True,                # Perform evaluation at the end of training
             report_to="wandb" if WANDB_PROJECT else "",         
             run_name=f"mistral7b-finetune-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"  if WANDB_PROJECT else ""     
@@ -192,12 +194,12 @@ def finetune(
 
 
 @stub.local_entrypoint()
-def main():
+def main(resume_from_checkpoint: str = None):
     print("Downloading data from Hugging Face and syncing to volume.")
     download_dataset.remote()
     print("Finished syncing data.")
 
     print("Starting training run.")
-    finetune.remote(model_name=BASE_MODEL, wandb_project=WANDB_PROJECT)
+    finetune.remote(model_name=BASE_MODEL, wandb_project=WANDB_PROJECT, resume_from_checkpoint=resume_from_checkpoint)
     print("Completed training!")
     print("To test your trained model, run `modal run inference.py`")

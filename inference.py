@@ -40,7 +40,9 @@ class Model:
         eval_prompt = f"""Given a target sentence construct the underlying meaning representation of the input sentence as a single function with attributes and attribute values.
         This function should describe the target string accurately and the function must be one of the following ['inform', 'request', 'give_opinion', 'confirm', 'verify_attribute', 'suggest', 'request_explanation', 'recommend', 'request_attribute'].
         The attributes must be one of the following: ['name', 'exp_release_date', 'release_year', 'developer', 'esrb', 'rating', 'genres', 'player_perspective', 'has_multiplayer', 'platforms', 'available_on_steam', 'has_linux_release', 'has_mac_release', 'specifier']
-
+        The order your list the attributes within the function must follow the order listed above. For example the 'name' attribute must always come before the 'exp_release_date' attribute, and so forth.
+        For each attribute, fill in the corresponding value of the attribute in brackets. A couple of examples are below. Note: you are to output the string after "Output: ". Do not include "Output: " in your answer.
+        
         ### Target sentence:
         {target_sentence}
 
@@ -74,6 +76,16 @@ class Model:
 
 @stub.local_entrypoint()
 def main():
-    sentence = "One thing I thought that makes Far Cry 3 a pretty good game is that it has multiplayer as well. It has a great single-player campaign, but you can jump online and enjoy it that way too."
-    model = Model()
-    model.generate_ft.remote(sentence)
+    sentences = [
+        "Earlier, you stated that you didn't have strong feelings about PlayStation's Little Big Adventure. Is your opinion true for all games which don't have multiplayer?",
+        # "One thing I thought that makes Far Cry 3 a pretty good game is that it has multiplayer as well. It has a great single-player campaign, but you can jump online and enjoy it that way too.",
+        # "Super Bomberman is an action-strategy game that has received average ratings and can be played on Nintendo and PC, though it's not available on Steam and does not have a Linux or Mac Release.",	
+        # "You mean Tony Hawk's Pro Skater 3, the 2001 sports game?",
+        # "Horizon: Zero Dawn is an action-adventure, role-playing, shooter with third person player perspective and no multiplayer mode, rated T (for Teen) and released in 2017 by Guerrilla Games.",
+        # "What is it about the driving/racing simulators made by Slightly Mad Studios that you find mediocre?",
+        # "Stronghold 2 was released in 2005 as a real-time strategy simulation played from the standard bird view perspective. It received an average rating from players.",
+        # "Naughty Dog did an amazing job with The Last of Us, and they really made the most of that M rating.",
+    ]
+    
+    for output in Model().generate_ft.map(sentences):
+        print(output)
