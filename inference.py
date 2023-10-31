@@ -24,7 +24,7 @@ class Model:
         )
 
         self.finetuned_model = AutoModelForCausalLM.from_pretrained(
-            "/results/",  # Get finetuned model from results Volume (mounted at "/results")
+            "/results/",  # Get finetuned model from results Volume (mounted at "/results in our container")
             device_map="auto",
             trust_remote_code=True,
         )
@@ -60,7 +60,7 @@ class Model:
 
         self.pretrained_model.eval()
         with torch.no_grad():
-            print(self.eval_tokenizer.decode(self.pretrained_model.generate(**model_input, max_new_tokens=300)[0], skip_special_tokens=True))
+            print(self.eval_tokenizer.decode(self.pretrained_model.generate(**model_input, max_new_tokens=300)[0], skip_special_tokens=False))
 
     # Inference function with finetuned model
     @method()
@@ -71,21 +71,24 @@ class Model:
 
         self.finetuned_model.eval()
         with torch.no_grad():
-            print(self.eval_tokenizer.decode(self.finetuned_model.generate(**model_input, max_new_tokens=300)[0], skip_special_tokens=True))
+            print(self.eval_tokenizer.decode(self.finetuned_model.generate(**model_input, max_new_tokens=300)[0], skip_special_tokens=False))
 
 
 @stub.local_entrypoint()
 def main():
     sentences = [
         "Earlier, you stated that you didn't have strong feelings about PlayStation's Little Big Adventure. Is your opinion true for all games which don't have multiplayer?",
-        # "One thing I thought that makes Far Cry 3 a pretty good game is that it has multiplayer as well. It has a great single-player campaign, but you can jump online and enjoy it that way too.",
-        # "Super Bomberman is an action-strategy game that has received average ratings and can be played on Nintendo and PC, though it's not available on Steam and does not have a Linux or Mac Release.",	
-        # "You mean Tony Hawk's Pro Skater 3, the 2001 sports game?",
-        # "Horizon: Zero Dawn is an action-adventure, role-playing, shooter with third person player perspective and no multiplayer mode, rated T (for Teen) and released in 2017 by Guerrilla Games.",
-        # "What is it about the driving/racing simulators made by Slightly Mad Studios that you find mediocre?",
-        # "Stronghold 2 was released in 2005 as a real-time strategy simulation played from the standard bird view perspective. It received an average rating from players.",
-        # "Naughty Dog did an amazing job with The Last of Us, and they really made the most of that M rating.",
+        "One thing I thought that makes Far Cry 3 a pretty good game is that it has multiplayer as well. It has a great single-player campaign, but you can jump online and enjoy it that way too.",
+        "Super Bomberman is an action-strategy game that has received average ratings and can be played on Nintendo and PC, though it's not available on Steam and does not have a Linux or Mac Release.",	
+        "You mean Tony Hawk's Pro Skater 3, the 2001 sports game?",
+        "Horizon: Zero Dawn is an action-adventure, role-playing, shooter with third person player perspective and no multiplayer mode, rated T (for Teen) and released in 2017 by Guerrilla Games.",
+        "What is it about the driving/racing simulators made by Slightly Mad Studios that you find mediocre?",
+        "Stronghold 2 was released in 2005 as a real-time strategy simulation played from the standard bird view perspective. It received an average rating from players.",
+        "Naughty Dog did an amazing job with The Last of Us, and they really made the most of that M rating.",
     ]
     
+    for output in Model().generate_base.map(sentences):
+        print(output)
+
     for output in Model().generate_ft.map(sentences):
         print(output)
