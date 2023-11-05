@@ -24,7 +24,7 @@ class Model:
         )
 
         self.finetuned_model = AutoModelForCausalLM.from_pretrained(
-            "/results/",  # Get finetuned model from results Volume (mounted at "/results in our container")
+            "/results/",  # Get finetuned model from results Volume (mounted at "/results" in our container)
             device_map="auto",
             trust_remote_code=True,
         )
