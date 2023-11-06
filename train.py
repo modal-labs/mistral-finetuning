@@ -24,10 +24,21 @@ def download_dataset():
     import os
     from datasets import load_dataset
 
-    if not os.path.exists('/training_data/data_train.csv'):
-        dataset = load_dataset('gem/viggo')  # downloading data from hugging face
-        for split, dataset in dataset.items():
-            dataset.to_csv(f"/training_data/data_{split}.csv") # writing data to training data Volume (mounted at /training-data in container)
+    if not os.path.exists('/training_data/data_train.jsonl'):
+        def format_instruction(sample):
+            PROMPT_TEMPLATE = "[INST] <<SYS>>\nUse the Input to provide a summary of a conversation.\n<</SYS>>\n\nInput:\n{message} [/INST]\n\nSummary: {summary}"
+            return {"text": PROMPT_TEMPLATE.format(message=sample["dialogue"], summary=sample["summary"])}
+        
+        # downloading data from hugging face
+        train_dataset = load_dataset('samsum', split='train')
+        val_dataset = load_dataset('samsum', split='validation')
+
+        train_dataset = train_dataset.map(format_instruction, remove_columns=['id', 'dialogue', 'summary'])
+        val_dataset = val_dataset.map(format_instruction, remove_columns=['id', 'dialogue', 'summary'])
+
+        # writing data to Volume mounted at "/training-data" in container
+        train_dataset.to_json(f"/training_data/data_train.jsonl")
+        val_dataset.to_json(f"/training_data/data_val.jsonl")
         
     stub.training_data_volume.commit()
 
@@ -64,50 +75,44 @@ def finetune(
         bnb_4bit_compute_dtype=torch.bfloat16
     )
 
-    model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, quantization_config=bnb_config)  # Load and quantize the pretrained model baked into our modal.Image
+    model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, quantization_config=bnb_config)  # Load and quantize the pretrained model baked into our image
     
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     tokenizer.pad_token = tokenizer.eos_token
 
-    def tokenize(prompt):
+    def tokenize(sample, cutoff_len=512, add_eos_token=True):
+        prompt = sample["text"]
+        
         result = tokenizer.__call__(
             prompt,
             truncation=True,
-            max_length=512,
+            max_length=cutoff_len,
             padding="max_length",
         )
+        if (
+            result["input_ids"][-1] != tokenizer.eos_token_id
+            and len(result["input_ids"]) < cutoff_len
+            and add_eos_token
+        ):
+            result["input_ids"].append(tokenizer.eos_token_id)
+            result["attention_mask"].append(1)
+        
         result["labels"] = result["input_ids"].copy()
 
         return result
     
-    def generate_and_tokenize_prompt(data_point):
-        full_prompt =f"""Given a target sentence construct the underlying meaning representation of the input sentence as a single function with attributes and attribute values.
-        This function should describe the target string accurately and the function must be one of the following ['inform', 'request', 'give_opinion', 'confirm', 'verify_attribute', 'suggest', 'request_explanation', 'recommend', 'request_attribute'].
-        The attributes must be one of the following: ['name', 'exp_release_date', 'release_year', 'developer', 'esrb', 'rating', 'genres', 'player_perspective', 'has_multiplayer', 'platforms', 'available_on_steam', 'has_linux_release', 'has_mac_release', 'specifier']
-        The order your list the attributes within the function must follow the order listed above. For example the 'name' attribute must always come before the 'exp_release_date' attribute, and so forth.
-        For each attribute, fill in the corresponding value of the attribute in brackets. A couple of examples are below. Note: you are to output the string after "Output: ". Do not include "Output: " in your answer.
-        
-        ### Target sentence:
-        {data_point["target"]}
-
-        ### Meaning representation:
-        {data_point["meaning_representation"]}
-        """
-
-        return tokenize(full_prompt)
-    
     # Load datasets from training data Volume
-    train_dataset = load_dataset('csv', data_files='/training_data/data_train.csv', split='train')
-    eval_dataset = load_dataset('csv', data_files='/training_data/data_validation.csv', split='train')
+    train_dataset = load_dataset('json', data_files='/training_data/data_train.jsonl', split="train")
+    eval_dataset = load_dataset('json', data_files='/training_data/data_val.jsonl', split="train")
 
-    tokenized_train_dataset = train_dataset.map(generate_and_tokenize_prompt)
-    tokenized_val_dataset = eval_dataset.map(generate_and_tokenize_prompt)
+    tokenized_train_dataset = train_dataset.map(tokenize)
+    tokenized_val_dataset = eval_dataset.map(tokenize)
 
     model.gradient_checkpointing_enable()
     model = prepare_model_for_kbit_training(model)
 
     config = LoraConfig(
-        r=8,
+        r=64,
         lora_alpha=16,
         target_modules=[
             "q_proj",
@@ -162,10 +167,10 @@ def finetune(
         args=transformers.TrainingArguments(
             output_dir="/results",  # Must also set this to write into results Volume's mount location
             warmup_steps=5,
-            per_device_train_batch_size=2,
+            per_device_train_batch_size=8,
             gradient_accumulation_steps=4,
             max_steps=500,  # Feel free to tweak to correct for under/overfitting
-            learning_rate=2.5e-5, # ~10x smaller than Mistral's learning rate
+            learning_rate=2e-5, # ~10x smaller than Mistral's learning rate
             logging_steps=50,
             bf16=True,
             optim="adamw_8bit",
@@ -175,8 +180,8 @@ def finetune(
             evaluation_strategy="steps", # Evaluate the model every logging step
             eval_steps=50,               # Evaluate and save checkpoints every 50 steps
             do_eval=True,                # Perform evaluation at the end of training
-            report_to="wandb" if WANDB_PROJECT else "",         
-            run_name=f"mistral7b-finetune-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"  if WANDB_PROJECT else ""     
+            report_to="wandb" if wandb_project else "",         
+            run_name=f"mistral7b-finetune-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"  if wandb_project else ""     
         ),
         data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
     )

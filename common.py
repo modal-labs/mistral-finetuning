@@ -35,6 +35,7 @@ image = (
     .apt_install("git")
     # packages pinned to 11/1/2023
     .pip_install(
+        # pinned to 11/1/2023
         "bitsandbytes==0.41.1",
         "peft==0.6.0",
         "transformers==4.35.0",
@@ -42,6 +43,7 @@ image = (
         "datasets==2.14.6",
         "scipy==1.11.3",
         "wandb==0.15.12",
+        "py7zr",  # needed for samsum dataset
     )
     .pip_install(
         "torch==2.0.1+cu118", index_url="https://download.pytorch.org/whl/cu118"
