@@ -34,13 +34,15 @@ image = (
     )
     .apt_install("git")
     .pip_install(
+        # pinned to 11/1/2023
         "bitsandbytes==0.41.1",
-        "git+https://github.com/huggingface/peft.git@2464c572eba6b60a9d19ba1913fcec6bc0a2724b",
-        "git+https://github.com/huggingface/transformers.git@a2f55a65cd0eb3bde0db4d5102a824ec96c7d7e9",
-        "git+https://github.com/huggingface/accelerate.git@11e2e99cfca3afe1cefe02111f40665b692b86fb",
+        "peft==0.6.0",
+        "transformers==4.35.0",
+        "accelerate==0.24.1",
         "datasets==2.14.6",
         "scipy==1.11.3",
         "wandb==0.15.12",
+        "py7zr",  # needed for samsum dataset
     )
     .pip_install(
         "torch==2.0.1+cu118", index_url="https://download.pytorch.org/whl/cu118"

@@ -21,9 +21,9 @@ To launch a training job, use:
 modal run train.py
 ```
 
-To resume training from a certain checkpoint saved to your results Volume, you can use the resume_from_checkpoint flag:
+To resume training from a certain checkpoint saved to your results Volume, you can use the resume-from-checkpoint flag:
 ```
-modal run train.py --resume_from_checkpoint /results/<checkpoint-number>
+modal run train.py --resume-from-checkpoint /results/<checkpoint-number>
 ```
 
 ## Inference
