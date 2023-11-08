@@ -169,7 +169,7 @@ def finetune(
             warmup_steps=5,
             per_device_train_batch_size=8,
             gradient_accumulation_steps=4,
-            max_steps=500,  # Feel free to tweak to correct for under/overfitting
+            max_steps=1000,  # Feel free to tweak to correct for under/overfitting
             learning_rate=2e-5, # ~10x smaller than Mistral's learning rate
             logging_steps=50,
             bf16=True,
