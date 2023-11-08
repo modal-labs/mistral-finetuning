@@ -26,6 +26,11 @@ To resume training from a certain checkpoint saved to your results Volume, you c
 modal run train.py --resume-from-checkpoint /results/<checkpoint-number>
 ```
 
+You can check to see if your adapter weights have been saved in your results volume by running:
+```
+modal volume ls results-vol
+```
+
 ## Inference
 To try out your freshly fine-tuned model, use:
 ```
