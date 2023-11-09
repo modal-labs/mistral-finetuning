@@ -21,12 +21,17 @@ To launch a training job, use:
 modal run train.py
 ```
 
-To resume training from a certain checkpoint saved to your results Volume, you can use the resume-from-checkpoint flag:
+Flags:
+- `--detach`: don't terminate app when your local process dies or disconnects (i.e. makes sure you don't accidentally terminate your training job when you close your terminal).
+```
+modal run --detach train.py
+```
+- `--resume-from-checkpoint`: resume training from a certain checkpoint saved to your results volume.
 ```
 modal run train.py --resume-from-checkpoint /results/<checkpoint-number>
 ```
 
-You can check to see if your adapter weights have been saved in your results volume by running:
+You should make sure your adapter weights have been properly saved in your results volume by running:
 ```
 modal volume ls results-vol
 ```
