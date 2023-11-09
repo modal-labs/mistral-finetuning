@@ -46,7 +46,7 @@ def download_dataset():
 @stub.function(
     gpu="A100",
     secret=Secret.from_name("my-wandb-secret") if WANDB_PROJECT else None,
-    timeout=60 * 60 * 2,
+    timeout=60 * 60 * 4,
     volumes=VOLUME_CONFIG,
 )
 def finetune(
@@ -184,11 +184,6 @@ def finetune(
             run_name=f"mistral7b-finetune-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"  if wandb_project else ""     
         ),
         data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
-    )
-
-    old_state_dict = model.state_dict
-    model.state_dict = (lambda self, *_, **__: get_peft_model_state_dict(self, old_state_dict())).__get__(
-        model, type(model)
     )
 
     model.config.use_cache = False  # Silence the warnings. Re-enable for inference!
