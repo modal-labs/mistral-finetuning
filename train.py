@@ -1,3 +1,4 @@
+from datetime import datetime
 from modal import Secret
 from transformers import TrainerCallback
 
@@ -51,17 +52,16 @@ def download_dataset():
 )
 def finetune(
     model_name: str, 
+    run_id: str = "",
     wandb_project: str = "", 
     resume_from_checkpoint: str = None  # path to checkpoint in Volume (e.g. "/results/checkpoint-300/")
 ):
     import os
-    from datetime import datetime
     import torch
     import transformers
     from peft import (
         LoraConfig,
         get_peft_model,
-        get_peft_model_state_dict,
         prepare_model_for_kbit_training,
         set_peft_model_state_dict,
     )
@@ -82,7 +82,6 @@ def finetune(
 
     def tokenize(sample, cutoff_len=512, add_eos_token=True):
         prompt = sample["text"]
-        
         result = tokenizer.__call__(
             prompt,
             truncation=True,
@@ -96,7 +95,6 @@ def finetune(
         ):
             result["input_ids"].append(tokenizer.eos_token_id)
             result["attention_mask"].append(1)
-        
         result["labels"] = result["input_ids"].copy()
 
         return result
@@ -165,7 +163,7 @@ def finetune(
         eval_dataset=tokenized_val_dataset,
         callbacks=[CheckpointCallback(stub.results_volume)], # Callback function for committing a checkpoint to Volume when reached
         args=transformers.TrainingArguments(
-            output_dir="/results",  # Must also set this to write into results Volume's mount location
+            output_dir=f"/results/{run_id}",  # Must also set this to write into results Volume's mount location
             warmup_steps=5,
             per_device_train_batch_size=8,
             gradient_accumulation_steps=4,
@@ -181,7 +179,7 @@ def finetune(
             eval_steps=50,               # Evaluate and save checkpoints every 50 steps
             do_eval=True,                # Perform evaluation at the end of training
             report_to="wandb" if wandb_project else "",         
-            run_name=f"mistral7b-finetune-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"  if wandb_project else ""     
+            run_name=run_id if wandb_project else ""     
         ),
         data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
     )
@@ -189,17 +187,20 @@ def finetune(
     model.config.use_cache = False  # Silence the warnings. Re-enable for inference!
     trainer.train()  # Run training
     
-    model.save_pretrained(f"/results")  # Store fully trained model in results Volume
+    model.save_pretrained(f"/results/{run_id}") 
     stub.results_volume.commit()
 
 
 @stub.local_entrypoint()
-def main(resume_from_checkpoint: str = None):
+def main(run_id: str = "", resume_from_checkpoint: str = None):
     print("Downloading data from Hugging Face and syncing to volume.")
     download_dataset.remote()
     print("Finished syncing data.")
 
-    print("Starting training run.")
-    finetune.remote(model_name=BASE_MODEL, wandb_project=WANDB_PROJECT, resume_from_checkpoint=resume_from_checkpoint)
-    print("Completed training!")
-    print("To test your trained model, run `modal run inference.py`")
+    if not run_id:
+        run_id = f"mistral7b-finetune-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+
+    print(f"Starting training run {run_id=}.")
+    finetune.remote(model_name=BASE_MODEL, run_id=run_id, wandb_project=WANDB_PROJECT, resume_from_checkpoint=resume_from_checkpoint)
+    print(f"Completed training run {run_id=}")
+    print("To test your trained model, run `modal run inference.py --run_id <run_id>`")
