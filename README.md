@@ -26,6 +26,10 @@ Flags:
 ```
 modal run --detach train.py
 ```
+- `--run_id`: use your own run_id to track your training runs (otherwise will default to `mistral7b-finetune-%Y-%m-%d-%H-%M`)
+```
+modal run train.py --run_id <run_id>
+```
 - `--resume-from-checkpoint`: resume training from a certain checkpoint saved to your results volume.
 ```
 modal run train.py --resume-from-checkpoint /results/<checkpoint-number>
@@ -39,7 +43,7 @@ modal volume ls results-vol
 ## Inference
 To try out your freshly fine-tuned model, use:
 ```
-modal run inference.py
+modal run inference.py --run_id <run_id>
 ```
 
 ## Next steps
