@@ -169,10 +169,8 @@ def finetune(
             gradient_accumulation_steps=4,
             max_steps=1000,  # Feel free to tweak to correct for under/overfitting
             learning_rate=2e-5, # ~10x smaller than Mistral's learning rate
-            logging_steps=50,
             bf16=True,
             optim="adamw_8bit",
-            logging_dir="/results/logs",        # Directory for storing logs
             save_strategy="steps",       # Save the model checkpoint every logging step
             save_steps=50,                # Save checkpoints every 50 steps
             evaluation_strategy="steps", # Evaluate the model every logging step
